@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SkinScan AI — Lesion Classifier</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cream:   #F7F5F0;
+      --white:   #FFFFFF;
+      --ink:     #1A1A1A;
+      --muted:   #6B6B6B;
+      --border:  #E2DED8;
+      --accent:  #1D6A5A;
+      --accent-l:#E8F3F0;
+      --danger:  #C0392B;
+      --danger-l:#FDECEA;
+      --warn:    #B7600A;
+      --warn-l:  #FEF3E2;
+      --radius:  12px;
+      --shadow:  0 2px 16px rgba(0,0,0,0.07);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 34px; height: 34px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-icon svg { width: 18px; height: 18px; }
+    .logo-text {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.2rem;
+      letter-spacing: -0.3px;
+    }
+    .logo-text span { color: var(--accent); }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 500;
+      background: var(--warn-l);
+      color: var(--warn);
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── Main ── */
+    main {
+      flex: 1;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 3rem 1rem 4rem;
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      width: 100%;
+      max-width: 560px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 2rem 2rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-header h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.6rem;
+      font-weight: 400;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+    .card-header p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .card-body { padding: 2rem; }
+
+    /* ── Upload zone ── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+      background: var(--cream);
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-l);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute; inset: 0;
+      opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-icon {
+      width: 48px; height: 48px;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1rem;
+    }
+    .upload-icon svg { width: 22px; height: 22px; color: var(--accent); }
+    .upload-zone h3 {
+      font-size: 0.95rem;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .upload-zone p {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    .upload-zone .browse { color: var(--accent); font-weight: 500; }
+
+    /* ── Preview ── */
+    #preview-wrap {
+      display: none;
+      margin-top: 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      position: relative;
+    }
+    #preview-img {
+      width: 100%;
+      max-height: 260px;
+      object-fit: cover;
+      display: block;
+    }
+    #remove-btn {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      width: 28px; height: 28px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: var(--muted);
+      transition: color 0.15s;
+    }
+    #remove-btn:hover { color: var(--danger); }
+
+    /* ── Button ── */
+    #predict-btn {
+      width: 100%;
+      margin-top: 1.25rem;
+      padding: 14px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    #predict-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+    #predict-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Result ── */
+    #result-wrap { display: none; margin-top: 1.5rem; }
+
+    .result-card {
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .result-card.safe   { background: var(--accent-l); border: 1px solid #B2D8D0; }
+    .result-card.warn   { background: var(--warn-l);   border: 1px solid #F5C88A; }
+    .result-card.danger { background: var(--danger-l); border: 1px solid #F5B7B1; }
+
+    .result-dot {
+      width: 40px; height: 40px; border-radius: 50%;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+    }
+    .safe   .result-dot { background: var(--accent); }
+    .warn   .result-dot { background: var(--warn); }
+    .danger .result-dot { background: var(--danger); }
+
+    .result-info h2 {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    .result-info .conf {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+    .conf strong { color: var(--ink); font-weight: 500; }
+
+    /* confidence bar */
+    .conf-bar-wrap {
+      margin-top: 1rem;
+      background: var(--cream);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+    }
+    .conf-bar-label {
+      display: flex; justify-content: space-between;
+      font-size: 0.8rem; color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .conf-bar-track {
+      height: 6px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .conf-bar-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: var(--accent);
+      width: 0%;
+      transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    /* ── Disclaimer ── */
+    .disclaimer {
+      margin-top: 1.5rem;
+      padding: 0.9rem 1.1rem;
+      background: #FAFAF8;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.78rem;
+      color: var(--muted);
+      line-height: 1.6;
+      display: flex; gap: 8px;
+    }
+    .disclaimer svg { flex-shrink: 0; margin-top: 1px; }
+
+    /* ── Error ── */
+    #error-wrap {
+      display: none;
+      margin-top: 1rem;
+      padding: 0.9rem 1.1rem;
+      background: var(--danger-l);
+      border: 1px solid #F5B7B1;
+      border-radius: var(--radius);
+      font-size: 0.85rem;
+      color: var(--danger);
+    }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      background: var(--white);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 8v4l3 3"/>
+      </svg>
+    </div>
+    <div class="logo-text">Skin<span>Scan</span> AI</div>
+  </div>
+  <span class="badge">Research Use Only</span>
+</header>
+
+<!-- Main -->
+<main>
+  <div class="card">
+    <div class="card-header">
+      <h1>Skin Lesion Classifier</h1>
+      <p>Upload a dermoscopic image to classify it into one of 7 skin lesion categories using a deep learning model trained on the HAM10000 dataset.</p>
+    </div>
+
+    <div class="card-body">
+
+      <!-- Upload zone -->
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept="image/jpeg,image/png"/>
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <h3>Drop image here or <span class="browse">browse</span></h3>
+        <p>Supports JPEG and PNG · Dermoscopic images only</p>
+      </div>
+
+      <!-- Image preview -->
+      <div id="preview-wrap">
+        <img id="preview-img" alt="Preview"/>
+        <button id="remove-btn" title="Remove">✕</button>
+      </div>
+
+      <!-- Error -->
+      <div id="error-wrap"></div>
+
+      <!-- Predict button -->
+      <button id="predict-btn" disabled>
+        <div class="spinner" id="spinner"></div>
+        <span id="btn-text">Analyse Image</span>
+      </button>
+
+      <!-- Result -->
+      <div id="result-wrap">
+        <div class="result-card" id="result-card">
+          <div class="result-dot" id="result-dot">🔬</div>
+          <div class="result-info">
+            <h2 id="result-class">—</h2>
+            <div class="conf">Confidence: <strong id="result-conf">—</strong></div>
+          </div>
+        </div>
+
+        <div class="conf-bar-wrap">
+          <div class="conf-bar-label">
+            <span>Model confidence</span>
+            <span id="conf-pct">—</span>
+          </div>
+          <div class="conf-bar-track">
+            <div class="conf-bar-fill" id="conf-bar"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Disclaimer -->
+      <div class="disclaimer">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        This tool is for research and educational purposes only. It is not a substitute for professional medical diagnosis. Always consult a qualified dermatologist.
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<footer>
+  HAM10000 Skin Lesion Classifier &mdash; Deep Learning Research Project
+</footer>
+
+<script>
+  // ── Config ──────────────────────────────────────────────────
+  // Change this to your deployed Render URL when live
+  const API_URL = "http://localhost:8000/predict";
+
+  // Risk level per class (for color coding)
+  const RISK = {
+    "Melanoma":                        "danger",
+    "Basal cell carcinoma":            "danger",
+    "Actinic keratoses":               "warn",
+    "Benign keratosis-like lesions":   "safe",
+    "Melanocytic nevi":                "safe",
+    "Dermatofibroma":                  "safe",
+    "Vascular lesions":                "safe",
+  };
+
+  // ── Elements ─────────────────────────────────────────────────
+  const fileInput   = document.getElementById('file-input');
+  const uploadZone  = document.getElementById('upload-zone');
+  const previewWrap = document.getElementById('preview-wrap');
+  const previewImg  = document.getElementById('preview-img');
+  const removeBtn   = document.getElementById('remove-btn');
+  const predictBtn  = document.getElementById('predict-btn');
+  const spinner     = document.getElementById('spinner');
+  const btnText     = document.getElementById('btn-text');
+  const resultWrap  = document.getElementById('result-wrap');
+  const resultCard  = document.getElementById('result-card');
+  const resultDot   = document.getElementById('result-dot');
+  const resultClass = document.getElementById('result-class');
+  const resultConf  = document.getElementById('result-conf');
+  const confBar     = document.getElementById('conf-bar');
+  const confPct     = document.getElementById('conf-pct');
+  const errorWrap   = document.getElementById('error-wrap');
+
+  let selectedFile = null;
+
+  // ── File selection ───────────────────────────────────────────
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  // Drag and drop
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!['image/jpeg','image/png','image/jpg'].includes(file.type)) {
+      showError("Please upload a JPEG or PNG image.");
+      return;
+    }
+    selectedFile = file;
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewImg.src = e.target.result;
+      previewWrap.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+    predictBtn.disabled = false;
+    hideError();
+    resultWrap.style.display = 'none';
+  }
+
+  // Remove image
+  removeBtn.addEventListener('click', () => {
+    selectedFile = null;
+    fileInput.value = '';
+    previewWrap.style.display = 'none';
+    predictBtn.disabled = true;
+    resultWrap.style.display = 'none';
+    hideError();
+  });
+
+  // ── Predict ──────────────────────────────────────────────────
+  predictBtn.addEventListener('click', async () => {
+    if (!selectedFile) return;
+
+    // Loading state
+    spinner.style.display = 'block';
+    btnText.textContent = 'Analysing…';
+    predictBtn.disabled = true;
+    resultWrap.style.display = 'none';
+    hideError();
+
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const response = await fetch(API_URL, { method: 'POST', body: formData });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "Server error");
+      }
+
+      const data = await response.json();
+      showResult(data);
+
+    } catch (err) {
+      if (err.message.includes('fetch')) {
+        showError("Could not reach the API. Make sure your server is running on localhost:8000");
+      } else {
+        showError(err.message);
+      }
+    } finally {
+      spinner.style.display = 'none';
+      btnText.textContent = 'Analyse Image';
+      predictBtn.disabled = false;
+    }
+  });
+
+  // ── Show result ───────────────────────────────────────────────
+  function showResult(data) {
+    const cls  = data.predicted_class;
+    const conf = data.confidence;
+    const pct  = Math.round(conf * 100);
+    const risk = RISK[cls] || 'safe';
+
+    // Update card style
+    resultCard.className = 'result-card ' + risk;
+    resultDot.textContent = risk === 'danger' ? '⚠️' : risk === 'warn' ? '🔍' : '✅';
+
+    resultClass.textContent = cls;
+    resultConf.textContent  = pct + '%';
+    confPct.textContent     = pct + '%';
+
+    // Animate bar
+    confBar.style.width = '0%';
+    confBar.style.background = risk === 'danger' ? 'var(--danger)' : risk === 'warn' ? 'var(--warn)' : 'var(--accent)';
+    resultWrap.style.display = 'block';
+    setTimeout(() => { confBar.style.width = pct + '%'; }, 50);
+  }
+
+  function showError(msg) {
+    errorWrap.textContent = '⚠ ' + msg;
+    errorWrap.style.display = 'block';
+  }
+  function hideError() {
+    errorWrap.style.display = 'none';
+  }
+</script>
+</body>
+</html>
